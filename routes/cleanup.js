@@ -4,6 +4,11 @@ const path = require("path");
 const pool = require("../config/database");
 const { authenticateToken } = require("../middleware/auth");
 const { checkAndUnlockAchievements } = require("./achievements");
+const { 
+  calculateCleanupPoints, 
+  recordPointsTransaction, 
+  updateUserPoints 
+} = require("../utils/pointsCalculator");
 
 const router = express.Router();
 
@@ -267,7 +272,27 @@ router.post("/complete", authenticateToken, async (req, res) => {
 
     const session = sessions[0];
 
-    // Update session
+    // Get trash report location for enhanced points calculation
+    const [trashReports] = await pool.execute(
+      "SELECT latitude, longitude FROM trash_reports WHERE id = ?",
+      [session.trash_report_id]
+    );
+    
+    const trashLocation = trashReports[0];
+    const timeTaken = new Date(endTime) - new Date(session.start_time);
+
+    // Calculate enhanced points for cleanup
+    const cleanupData = {
+      verificationResult,
+      timeTaken: timeTaken / 1000, // convert to seconds
+      difficulty: 'medium', // could be determined by trash type/size
+      latitude: trashLocation.latitude,
+      longitude: trashLocation.longitude
+    };
+
+    const { totalPoints: enhancedPoints, breakdown } = await calculateCleanupPoints(req.user.id, cleanupData);
+
+    // Update session with enhanced points
     await pool.execute(
       `
       UPDATE cleanup_sessions 
@@ -277,7 +302,7 @@ router.post("/complete", authenticateToken, async (req, res) => {
       [
         endTime,
         verificationResult.confidence,
-        verificationResult.pointsEarned,
+        enhancedPoints,
         sessionId,
       ]
     );
@@ -292,15 +317,21 @@ router.post("/complete", authenticateToken, async (req, res) => {
       [endTime, req.user.id, session.trash_report_id]
     );
 
-    // Update user points and stats
+    // Record points transaction and update user
+    await recordPointsTransaction(
+      req.user.id, 
+      'cleanup', 
+      enhancedPoints, 
+      breakdown, 
+      { cleanupId: sessionId, reportId: session.trash_report_id }
+    );
+    
+    await updateUserPoints(req.user.id, enhancedPoints, 'cleanup');
+
+    // Update user cleanup count
     await pool.execute(
-      `
-      UPDATE users 
-      SET points = points + ?, total_cleanups = total_cleanups + 1,
-          last_activity = CURDATE()
-      WHERE id = ?
-    `,
-      [verificationResult.pointsEarned, req.user.id]
+      "UPDATE users SET total_cleanups = total_cleanups + 1 WHERE id = ?",
+      [req.user.id]
     );
 
     // Check for achievements
@@ -310,12 +341,13 @@ router.post("/complete", authenticateToken, async (req, res) => {
     console.log("[CLEANUP/COMPLETE] Cleanup completed successfully:", {
       sessionId,
       trashId: session.trash_report_id,
-      pointsEarned: verificationResult.pointsEarned
+      pointsEarned: enhancedPoints
     });
     
     res.json({
       success: true,
-      pointsEarned: verificationResult.pointsEarned,
+      pointsEarned: enhancedPoints,
+      pointsBreakdown: breakdown,
       trashId: session.trash_report_id,
       newAchievements: newAchievements
     });

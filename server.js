@@ -7,12 +7,14 @@ require("dotenv").config();
 
 // Initialize achievements on startup
 const { initializeAchievements } = require("./utils/achievements");
+const { startScheduler } = require("./utils/scheduler");
 
 // Import routes (we'll create these next)
 const authRoutes = require("./routes/auth");
 const trashRoutes = require("./routes/trash");
 const cleanupRoutes = require("./routes/cleanup");
 const achievementRoutes = require("./routes/achievements");
+const pointsRoutes = require("./routes/points");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -63,6 +65,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/trash", trashRoutes);
 app.use("/api/cleanup", cleanupRoutes);
 app.use("/api/achievements", achievementRoutes);
+app.use("/api/points", pointsRoutes);
 
 // Error handling middleware
 app.use((error, req, res, next) => {
@@ -80,6 +83,9 @@ app.listen(PORT, async () => {
   
   // Initialize achievements
   await initializeAchievements();
+  
+  // Start scheduled tasks
+  startScheduler();
 });
 
 module.exports = app;

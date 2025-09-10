@@ -6,6 +6,11 @@ const { authenticateToken } = require("../middleware/auth");
 const { calculateDistance, validateCoordinates, checkProximity } = require("../utils/location");
 const { verifyPickupPhoto, generateImageHash, processImage, checkRateLimit } = require("../utils/verification");
 const { checkAndUnlockAchievements } = require("./achievements");
+const { 
+  calculateReportingPoints, 
+  recordPointsTransaction, 
+  updateUserPoints 
+} = require("../utils/pointsCalculator");
 
 const router = express.Router();
 
@@ -132,14 +137,21 @@ router.post(
         }
       }
 
-      // Calculate points based on AI analysis or fallback to manual data
+      // Calculate points using enhanced system
       const finalTrashType = trashType || (parsedTrashTypes && parsedTrashTypes[0]) || 'General';
       const finalSize = size || (severity === 'high' ? 'Large' : severity === 'low' ? 'Small' : 'Medium');
-      const points = calculatePoints(finalSize, finalTrashType);
+      
+      const reportData = {
+        size: finalSize,
+        trashType: finalTrashType,
+        severity: severity || 'medium',
+        aiDescription,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        trashCount: parseInt(trashCount) || 1
+      };
 
-      // Bonus points for AI analysis
-      const aiBonus = aiDescription ? 5 : 0;
-      const finalPoints = points + aiBonus;
+      const { totalPoints: finalPoints, breakdown } = await calculateReportingPoints(req.user.id, reportData);
 
       // Insert the report with AI data
       const [result] = await pool.execute(
@@ -173,10 +185,21 @@ router.post(
         [result.insertId]
       );
 
-      // Update user's report count and points
+      // Record points transaction and update user
+      await recordPointsTransaction(
+        req.user.id, 
+        'report', 
+        finalPoints, 
+        breakdown, 
+        { reportId: result.insertId }
+      );
+      
+      await updateUserPoints(req.user.id, finalPoints, 'report');
+
+      // Update user's report count
       await pool.execute(
-        "UPDATE users SET total_reports = total_reports + 1, points = points + ? WHERE id = ?",
-        [finalPoints, req.user.id]
+        "UPDATE users SET total_reports = total_reports + 1 WHERE id = ?",
+        [req.user.id]
       );
 
       // Check for achievements
@@ -187,6 +210,7 @@ router.post(
       
       const response = {
         ...reports[0],
+        pointsBreakdown: breakdown,
         newAchievements: newAchievements
       };
       
