@@ -334,8 +334,8 @@ function startScheduler() {
         (user_id, username, total_points, weekly_points, monthly_points, 
          level, rank_name, total_cleanups, total_reports, streak_days)
         SELECT 
-          id, name, points, weekly_points, monthly_points,
-          level, rank, total_cleanups, total_reports, streak_days
+          id, name, points, 0, 0,
+          level, \`rank\`, total_cleanups, total_reports, streak_days
         FROM users 
         WHERE points > 0 
         ORDER BY points DESC

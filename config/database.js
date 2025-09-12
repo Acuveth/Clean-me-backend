@@ -1,17 +1,25 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Create connection pool
+// Create connection pool with Windows MariaDB compatibility
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || "localhost",
+  host: process.env.DB_HOST || "127.0.0.1",
   user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "pass",
+  password: process.env.DB_PASSWORD || "",  // Empty password for default MariaDB
   database: process.env.DB_NAME || "trash_clean",
-  port: process.env.DB_PORT || 3306,
+  port: parseInt(process.env.DB_PORT || "3306"),
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   timezone: "+00:00",
+  connectTimeout: 60000,
+  // Skip SSL for local development
+  ssl: false,
+  // For MariaDB on Windows with GSSAPI issue
+  insecureAuth: true,
+  // Additional options for compatibility
+  multipleStatements: true,
+  dateStrings: true
 });
 
 // Test database connection
