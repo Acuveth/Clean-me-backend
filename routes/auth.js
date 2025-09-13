@@ -90,9 +90,9 @@ router.post("/register", async (req, res) => {
 
     // Get the created user with all fields
     const [users] = await pool.execute(
-      `SELECT id, email, name, profile_picture_url, bio, location, points, 
-       total_cleanups, total_reports, rank, streak_days, is_oauth_user, 
-       oauth_provider, created_at, updated_at FROM users WHERE id = ?`,
+      `SELECT id, email, name, profile_picture_url, points,
+       total_cleanups, total_reports, \`rank\`, streak_days, is_oauth_user,
+       oauth_provider, created_at, updated_at, level FROM users WHERE id = ?`,
       [result.insertId]
     );
 
@@ -109,13 +109,12 @@ router.post("/register", async (req, res) => {
         email: user.email,
         name: user.name,
         profilePictureUrl: user.profile_picture_url,
-        bio: user.bio,
-        location: user.location,
         points: user.points || 0,
         totalCleanups: user.total_cleanups || 0,
         totalReports: user.total_reports || 0,
         rank: user.rank || 'Beginner',
         streakDays: user.streak_days || 0,
+        level: user.level || 1,
         isOauthUser: user.is_oauth_user || false,
         oauthProvider: user.oauth_provider,
         createdAt: user.created_at,
@@ -179,13 +178,12 @@ router.post("/login", async (req, res) => {
         email: user.email,
         name: user.name,
         profilePictureUrl: user.profile_picture_url,
-        bio: user.bio,
-        location: user.location,
         points: user.points || 0,
         totalCleanups: user.total_cleanups || 0,
         totalReports: user.total_reports || 0,
         rank: user.rank || 'Beginner',
         streakDays: user.streak_days || 0,
+        level: user.level || 1,
         isOauthUser: user.is_oauth_user || false,
         oauthProvider: user.oauth_provider,
         createdAt: user.created_at,
@@ -206,7 +204,7 @@ router.get("/me", authenticateToken, async (req, res) => {
   try {
     // Get fresh user data from database
     const [users] = await pool.execute(
-      `SELECT id, email, name, profile_picture_url, bio, location, points, total_cleanups, total_reports, streak_days, is_oauth_user, oauth_provider, created_at, updated_at FROM users WHERE id = ?`,
+      `SELECT id, email, name, profile_picture_url, points, total_cleanups, total_reports, \`rank\`, streak_days, level, is_oauth_user, oauth_provider, created_at, updated_at FROM users WHERE id = ?`,
       [req.user.id]
     );
 
@@ -524,8 +522,8 @@ router.put("/profile", authenticateToken, uploadProfile.single("profileImage"), 
 
     // Get updated user data
     const [users] = await pool.execute(
-      `SELECT id, email, name, profile_picture_url, bio, location, points, 
-       total_cleanups, total_reports, rank, streak_days, is_oauth_user, 
+      `SELECT id, email, name, profile_picture_url, bio, location, points,
+       total_cleanups, total_reports, \`rank\`, streak_days, is_oauth_user,
        oauth_provider, created_at, updated_at
        FROM users WHERE id = ?`,
       [req.user.id]
@@ -955,8 +953,8 @@ router.post("/google/exchange", async (req, res) => {
 
     // Get fresh user data
     const [updatedUsers] = await pool.execute(
-      `SELECT id, email, name, profile_picture_url, bio, location, points, 
-       total_cleanups, total_reports, rank, streak_days, is_oauth_user, 
+      `SELECT id, email, name, profile_picture_url, bio, location, points,
+       total_cleanups, total_reports, \`rank\`, streak_days, is_oauth_user,
        oauth_provider, created_at, updated_at FROM users WHERE id = ?`,
       [user.id]
     );
