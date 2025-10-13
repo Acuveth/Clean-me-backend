@@ -42,8 +42,15 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(cors({
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -80,14 +87,36 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// Start server
-app.listen(PORT, async () => {
+// Get local network IP for convenience
+const getLocalIP = () => {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      // Skip internal and non-IPv4 addresses
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'localhost';
+};
+
+// Start server - listen on all network interfaces (0.0.0.0)
+app.listen(PORT, '0.0.0.0', async () => {
+  const localIP = getLocalIP();
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-  
+  console.log(`📍 Local: http://localhost:${PORT}/api/health`);
+  console.log(`📍 Network: http://${localIP}:${PORT}/api/health`);
+  console.log(`\n💡 For Expo app:`);
+  console.log(`   iOS Simulator: Use localhost`);
+  console.log(`   Android Emulator: Use 10.0.2.2`);
+  console.log(`   Physical Device: Use ${localIP}`);
+
   // Initialize achievements
   await initializeAchievements();
-  
+
   // Start scheduled tasks
   startScheduler();
 });
